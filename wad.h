@@ -6,10 +6,10 @@
 #include "list.h"
 #include "util.h"
 #include "list.h"
-#include <iostream>
 #include <iosfwd>
 #include <fstream>
 #include <regex>
+#include <math.h>
 
 #ifndef LUMPREADER_WAD_H
 #define LUMPREADER_WAD_H
@@ -19,15 +19,15 @@ using namespace std;
 struct Marker
 {
 	string       name = "NULL";
-	unsigned int start = -1;
-	unsigned int end = -1;
+	ulong start = -1;
+	ulong end = -1;
 };
 
 struct Lump
 {
 	byte         *data = nullptr;
-	unsigned int start = 0;
-	unsigned int size  = 0;
+	ulong start = 0;
+	ulong size  = 0;
 	string       name;
 	Marker       marker;
 };
@@ -37,6 +37,21 @@ struct Palette
 	byte red;
 	byte green;
 	byte blue;
+};
+
+struct Animation
+{
+	byte type;
+	string last;
+	string first;
+	ulong speed;
+};
+
+struct Switch
+{
+	string on;
+	string off;
+	ulong compat;
 };
 
 class Wad
@@ -50,6 +65,11 @@ private:
 	string wadType;
 	string filepath;
 	List<Palette> palettes;
+	List<Animation> animations;
+	List<Switch> switches;
+	void playpalLump(const Lump& lump);
+	void animatedLump(const Lump& lump);
+	void switchesLump(const Lump& lump);
 };
 
 #endif //LUMPREADER_WAD_H

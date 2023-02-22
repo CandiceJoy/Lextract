@@ -4,9 +4,11 @@
 
 #include "wad.h"
 
+#include <utility>
+
 Wad::Wad (string filepathIn)
 {
-	filepath = filepathIn;
+	filepath = std::move(filepathIn);
 }
 
 void Wad::load()
@@ -32,20 +34,20 @@ void Wad::load()
 		list[x] = b;
 	}
 
-	string       wadType   = util::asUppercaseString(list,0);
-	unsigned int numLumps  = util::asInt(list,4);
-	unsigned int directory = util::asInt(list,8);
+	wadType   = util::asUppercaseString(list,0);
+	ulong numLumps  = util::asUInt(list, 4);
+	ulong directory = util::asUInt(list, 8);
 	printf("Wad Type: %s\n",wadType.c_str());
-	printf("Num Lumps: %d\n",numLumps);
-	printf("Directory Location: %d\n",directory);
+	printf("Num Lumps: %lu\n",numLumps);
+	printf("Directory Location: %lu\n",directory);
 
 	printf("------------------------\n");
 
-	for (int x = 0; x < numLumps; x++)
+	for (ulong x = 0; x < numLumps; x++)
 	{
-		int    start     = (int)directory + (x * 16);
-		int    lumpStart = util::asInt(list,start);
-		int    lumpSize  = util::asInt(list,start + 4);
+		ulong    start     = directory + (x * 16);
+		ulong    lumpStart = util::asUInt(list, start);
+		ulong    lumpSize  = util::asUInt(list, start + 4);
 		string lumpName  = util::asUppercaseString(list,start + 8,8);
 
 		if (lumpSize == 0)
@@ -80,7 +82,7 @@ void Wad::load()
 				marker->name = name;
 			}
 
-			printf("Marker Start: %d\n",lumpStart);
+			printf("Marker Start: %lu\n",lumpStart);
 			printf("Marker Name: %s\n",lumpName.c_str());
 
 			if (loc != "END")
@@ -95,12 +97,12 @@ void Wad::load()
 			lump->start = lumpStart;
 			lump->size  = lumpSize;
 			lump->name = lumpName;
-			byte bytes = util::asBytes(list,lumpStart,lumpSize);
-			lump->data = &bytes;
-			//printf("----------------------------");
-			//printf("Lump Start: %d\n",lumpStart);
-			//printf("Lump Size: %d\n",lumpSize);
-			//printf("Lump Name: %s\n",lumpName.c_str());
+			byte* bytes = util::asBytes(list,lumpStart,lumpSize);
+			lump->data = bytes;
+			printf("----------------------------");
+			printf("Lump Start: %lu\n",lumpStart);
+			printf("Lump Size: %lu\n",lumpSize);
+			printf("Lump Name: %s\n",lumpName.c_str());
 			lumps += *lump;
 		}
 	}
@@ -129,16 +131,10 @@ void Wad::load()
 
 		//printf("Lump [%s - %d]; currentMarker %d\n", lump->name.c_str(),lump->start,currentMarker->start);
 
-		if(lump->start > currentMarker->start)
+		if(lump->start > currentMarker->start && index<markers.size())
 		{
-			index++;
-
-			if(index<markers.size())
-			{
-				index++;
-				currentMarker = &markers[index];
-				//if(currentMarker != nullptr )printf("NEXT! %s - %d\n",currentMarker->name.c_str(),currentMarker->start);
-			}
+			currentMarker = &markers[index++];
+			//if(currentMarker != nullptr )printf("NEXT! %s - %d\n",currentMarker->name.c_str(),currentMarker->start);
 		}
 
 		if(currentMarker == nullptr )
@@ -149,33 +145,68 @@ void Wad::load()
 		lump->marker = *currentMarker;
 	}
 
-	// Output
+	// Process Lumps
 	for( int x = 0; x < lumps.size(); x++ )
 	{
 		Lump lump = lumps[x];
 		printf("Lump Name: %s\n",lump.name.c_str());
-		printf("\tLump Start: %d\n",lump.start);
-		printf("\tLump Size: %d\n",lump.size);
+		printf("\tLump Start: %lu\n",lump.start);
+		printf("\tLump Size: %lu\n",lump.size);
 		printf("\tLump Namespace: %s\n",lump.marker.name.c_str());
 
-		if(lump.name=="PLAYPAL")
-		{
-			if(lump.size%(256*3)!=0) throw std::runtime_error("Invalid PLAYPAL format");
-			unsigned int numPal = lump.size / (256 * 3);
-
-			for(int pal = 0; pal < numPal; pal++)
-			{
-				byte red = lump.data[pal*3];
-				byte green = lump.data[pal*3+1];
-				byte blue = lump.data[pal*3+1];
-				Palette palette = {red,green,blue};
-				palettes += palette;
-				//printf("Palette %d = %hhu, %hhu, %hhu\n",pal,palettes[pal].red,palettes[pal].green,palettes[pal].blue);
-			}
-		}
+		if(lump.name=="PLAYPAL") playpalLump(lump);
+		if(lump.name=="ANIMATED") animatedLump(lump);
+		if(lump.name=="SWITCHES") switchesLump(lump);
 	}
 
 	printf("Size: %u\n",lumps.size());
 
 	delete file;
+}
+
+void Wad::playpalLump(const Lump& lump)
+{
+	if(lump.size%(256*3)!=0) throw std::runtime_error("Invalid PLAYPAL format");
+	unsigned int numPal = lump.size / (256 * 3);
+
+	for(int palNum = 0; palNum < numPal; palNum++)
+	{
+		int     recStart = palNum * 3;
+		byte    red      = lump.data[recStart];
+		byte    green    = lump.data[recStart + 1];
+		byte    blue     = lump.data[recStart + 2];
+		Palette palette  = {red,green,blue};
+		palettes += palette;
+		//printf("Palette %d = %hhu, %hhu, %hhu\n",pal,palettes[pal].red,palettes[pal].green,palettes[pal].blue);
+	}
+}
+
+void Wad::animatedLump(const Lump& lump)
+{
+	for(ulong recStart = 0; recStart < lump.size; recStart += 23)
+	{
+		byte type = lump.data[recStart];
+		if(type==(byte)255) break;
+		string tex1 = util::asString(lump.data,recStart+1,9);
+		string tex2 = util::asString(lump.data,recStart+10,9);
+		ulong speed = util::asUInt(lump.data, recStart + 19, 4);
+
+		Animation animation = {type,tex1,tex2,speed};
+		animations += animation;
+		printf("[%hhu] %s -> %s (%lu)\n",type,tex1.c_str(),tex2.c_str(),speed);
+	}
+}
+
+void Wad::switchesLump(const Lump& lump)
+{
+	for(ulong recStart = 0; recStart < lump.size; recStart += 20)
+	{
+		string tex1 = util::asString(lump.data,recStart,9);
+		string tex2 = util::asString(lump.data,recStart+9,9);
+		ulong compat = util::asUInt(lump.data, recStart + 18, 2);
+		if(compat==0)break;
+		Switch s = {tex1,tex2,compat};
+		switches += s;
+		printf("%s -> %s (%lu)\n", tex1.c_str(), tex2.c_str(), compat);
+	}
 }

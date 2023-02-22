@@ -56,7 +56,7 @@ int main (int argc,char **argv)
 				return 1;
 			}
 
-			printf("Variable %s = %s\n",expectingWhat.c_str(),arg.c_str());
+			//printf("Variable %s = %s\n",expectingWhat.c_str(),arg.c_str());
 			expecting     = false;
 			expectingWhat = "";
 			continue;
@@ -72,9 +72,17 @@ int main (int argc,char **argv)
 
 	}
 
-	return 0;
+//	return 0;
 
-	string filepath = "/Users/candice/Dropbox/SaveGames/doom/IWads/strife1.wad";
+	// Test SWITCHES
+	string filepath = "/Users/candice/Dropbox/SaveGames/doom/MapPacks/Eviternity.wad";
+
+	// Test ANIMATED
+	//string filepath = "/Users/candice/Dropbox/SaveGames/doom/MapPacks/gd.wad";
+
+	// General Purpose
+	//string filepath = "/Users/candice/Dropbox/SaveGames/doom/IWADs/DOOM2.wad";
+
 	Wad    wad      = *new Wad(filepath);
 	wad.load();
 
